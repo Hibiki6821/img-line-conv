@@ -3,250 +3,321 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web版 画像線画変換ツール</title>
-    <!-- Tailwind CSS for styling -->
+    <title>画像編集アプリ</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- OpenCV.js -->
-    <script async src="https://docs.opencv.org/4.9.0/opencv.js" onload="onOpenCvReady();"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        /* Custom styles */
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
         }
-        .drop-zone {
-            border: 2px dashed #cbd5e1;
-            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        /* Custom styles for better range slider in Firefox */
+        input[type=range]::-moz-range-track {
+            background: #4a5568; /* bg-gray-700 */
         }
-        .drop-zone.drag-over {
-            background-color: #e2e8f0;
-            border-color: #4c51bf;
+        input[type=range]::-moz-range-thumb {
+            background: #a78bfa; /* bg-violet-400 */
+            border: none;
         }
-        .loader {
-            border-top-color: #4c51bf;
-            animation: spin 1s linear infinite;
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(1, 1fr);
+            gap: 1.5rem;
         }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        @media (min-width: 768px) {
+            .controls-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
-        /* Canvas preview styling */
-        #canvasOutput {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain; /* Maintain aspect ratio */
-        }
-        #output-container {
-             background-image:
-                linear-gradient(45deg, #eee 25%, transparent 25%),
-                linear-gradient(-45deg, #eee 25%, transparent 25%),
-                linear-gradient(45deg, transparent 75%, #eee 75%),
-                linear-gradient(-45deg, transparent 75%, #eee 75%);
-            background-size: 20px 20px;
-            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+         @media (min-width: 1024px) {
+            .controls-grid {
+                grid-template-columns: 1fr 2fr 1fr;
+                 align-items: start;
+            }
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 flex flex-col items-center justify-center min-h-screen p-4">
+<body class="bg-gray-800 text-gray-200">
 
-    <div class="w-full max-w-4xl bg-white rounded-xl shadow-lg p-6 md:p-8">
-        <div id="loader" class="text-center">
-            <h1 class="text-2xl font-bold text-gray-700 mb-2">画像線画変換ツール</h1>
-            <div class="flex items-center justify-center space-x-2 text-lg text-indigo-600">
-                <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-6 w-6"></div>
-                <span>OpenCV.jsを読み込み中...</span>
-            </div>
-            <p class="mt-2 text-sm text-gray-500">初回読み込みには少し時間がかかります。</p>
-        </div>
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-white">画像編集アプリケーション</h1>
+            <p class="text-gray-400 mt-2">画像を4Kに変換し、指定範囲を線画とパターンで加工します。</p>
+        </header>
 
-        <div id="main-content" class="hidden">
-            <h1 class="text-2xl md:text-3xl font-bold text-gray-800 text-center mb-6">画像線画変換ツール</h1>
-
-            <!-- Drop Zone -->
-            <div id="drop-zone" class="drop-zone w-full rounded-lg p-8 md:p-12 text-center cursor-pointer mb-6">
-                <p class="text-gray-500">ここに画像ファイルをドラッグ＆ドロップ</p>
-                <p class="text-gray-400 text-sm mt-2">またはクリックしてファイルを選択</p>
-                <input type="file" id="file-input" class="hidden" accept="image/*">
-            </div>
-
-            <!-- Image Preview & Controls -->
-            <div id="editor" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                <!-- Output Canvas -->
-                <div id="output-container" class="w-full bg-white rounded-lg shadow-inner flex items-center justify-center aspect-square overflow-hidden">
-                    <canvas id="canvasOutput"></canvas>
+        <!-- Controls Section -->
+        <div class="bg-gray-900 p-6 rounded-xl shadow-2xl mb-6">
+            <div class="controls-grid">
+                
+                <!-- 1. Image Upload -->
+                <div class="flex flex-col gap-4">
+                    <div>
+                        <label for="imageLoader" class="block mb-2 text-sm font-medium text-gray-300">1. 画像を選択</label>
+                        <input type="file" id="imageLoader" accept="image/*" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-700 transition-colors cursor-pointer"/>
+                    </div>
+                    <div id="thresholdControl" class="hidden">
+                        <label for="thresholdSlider" class="block mb-2 text-sm font-medium text-gray-300">2. 線画のしきい値: <span id="thresholdValue" class="font-bold text-violet-400">100</span></label>
+                        <input type="range" id="thresholdSlider" min="0" max="255" value="100" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
+                    </div>
                 </div>
 
-                <!-- Controls -->
-                <div class="bg-gray-50 p-6 rounded-lg">
-                    <h2 class="text-xl font-bold mb-4">設定</h2>
-                    <div class="space-y-6">
-                        <!-- Threshold 1 -->
+                <!-- 2. Slider Controls -->
+                <div id="sliderControls" class="hidden">
+                    <p class="block mb-2 text-sm font-medium text-gray-300">3. 円をスライダーで操作</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
-                            <label for="threshold1" class="flex justify-between font-medium text-gray-700">
-                                <span>しきい値 1 (低いほど細かい線)</span>
-                                <span id="threshold1-value" class="text-indigo-600 font-semibold">100</span>
-                            </label>
-                            <input id="threshold1" type="range" min="0" max="500" value="100" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            <label for="xSlider" class="block text-xs font-medium text-gray-400">X座標</label>
+                            <input type="range" id="xSlider" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
                         </div>
-                        <!-- Threshold 2 -->
                         <div>
-                            <label for="threshold2" class="flex justify-between font-medium text-gray-700">
-                                <span>しきい値 2 (高いほど線を減らす)</span>
-                                <span id="threshold2-value" class="text-indigo-600 font-semibold">200</span>
-                            </label>
-                            <input id="threshold2" type="range" min="0" max="500" value="200" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            <label for="ySlider" class="block text-xs font-medium text-gray-400">Y座標</label>
+                            <input type="range" id="ySlider" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
+                        </div>
+                        <div>
+                            <label for="zoomSlider" class="block text-xs font-medium text-gray-400">ズーム</label>
+                            <input type="range" id="zoomSlider" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
                         </div>
                     </div>
-                    
-                    <a id="save-button" class="mt-8 block w-full bg-indigo-600 text-white text-center font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 transition duration-300 shadow-md">
-                        画像を保存 (.png)
-                    </a>
                 </div>
+                
+                <!-- 3. Download Button -->
+                <div id="downloadControl" class="hidden self-end">
+                    <button id="downloadButton" class="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-md">
+                        画像をダウンロード
+                    </button>
+                </div>
+
             </div>
-             <!-- Hidden canvas for input image -->
-            <canvas id="canvasInput" class="hidden"></canvas>
+        </div>
+
+        <!-- Canvas Section -->
+        <div id="editor-area" class="w-full bg-gray-900 rounded-xl shadow-2xl p-2" style="display: none;">
+             <div id="canvasContainer" class="relative w-full mx-auto" style="aspect-ratio: 16/9;">
+                <canvas id="bgCanvas" class="absolute top-0 left-0 w-full h-full rounded-lg bg-black/20"></canvas>
+                <canvas id="patternCanvas" class="absolute top-0 left-0 w-full h-full rounded-lg pointer-events-none"></canvas>
+                <canvas id="lineArtCanvas" class="absolute top-0 left-0 w-full h-full rounded-lg pointer-events-none"></canvas>
+                <canvas id="uiCanvas" class="absolute top-0 left-0 w-full h-full rounded-lg pointer-events-none"></canvas>
+            </div>
         </div>
     </div>
 
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" class="hidden fixed inset-0 bg-black/70 z-50 flex flex-col justify-center items-center">
+        <div class="w-16 h-16 border-4 border-t-transparent border-violet-500 rounded-full animate-spin"></div>
+        <p id="loadingText" class="mt-4 text-white text-lg font-semibold">画像を処理中...</p>
+    </div>
+
     <script>
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('file-input');
-        const editor = document.getElementById('editor');
-        const canvasInput = document.getElementById('canvasInput');
-        const canvasOutput = document.getElementById('canvasOutput');
-        const slider1 = document.getElementById('threshold1');
-        const slider2 = document.getElementById('threshold2');
-        const slider1Value = document.getElementById('threshold1-value');
-        const slider2Value = document.getElementById('threshold2-value');
-        const saveButton = document.getElementById('save-button');
+        // DOM Elements
+        const imageLoader = document.getElementById('imageLoader');
+        const thresholdControl = document.getElementById('thresholdControl');
+        const downloadControl = document.getElementById('downloadControl');
+        const thresholdSlider = document.getElementById('thresholdSlider');
+        const thresholdValue = document.getElementById('thresholdValue');
+        const downloadButton = document.getElementById('downloadButton');
+        const canvasContainer = document.getElementById('canvasContainer');
+        const editorArea = document.getElementById('editor-area');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const loadingText = document.getElementById('loadingText');
+        const sliderControls = document.getElementById('sliderControls');
+        const xSlider = document.getElementById('xSlider');
+        const ySlider = document.getElementById('ySlider');
+        const zoomSlider = document.getElementById('zoomSlider');
+
+        // Canvases
+        const bgCanvas = document.getElementById('bgCanvas');
+        const patternCanvas = document.getElementById('patternCanvas');
+        const lineArtCanvas = document.getElementById('lineArtCanvas');
+        const uiCanvas = document.getElementById('uiCanvas');
+
+        // 2D Contexts
+        const bgCtx = bgCanvas.getContext('2d');
+        const patternCtx = patternCanvas.getContext('2d');
+        const lineArtCtx = lineArtCanvas.getContext('2d');
+        const uiCtx = uiCanvas.getContext('2d');
         
-        let originalImage = null;
-        let cvReady = false;
+        // --- Application State ---
+        let img = null;
+        let originalImageData = null;
+        let canvasWidth, canvasHeight;
+        let circle = { x: 0, y: 0, radius: 150 };
+        
+        // --- Constants ---
+        const MAX_WIDTH = 3840;
+        const MAX_HEIGHT = 2160;
 
-        function onOpenCvReady() {
-            cvReady = true;
-            document.getElementById('loader').classList.add('hidden');
-            document.getElementById('main-content').classList.remove('hidden');
-            console.log("OpenCV.js is ready.");
+        // --- Utility Functions ---
+        function showLoading(show, text = '処理中...') {
+            loadingText.textContent = text;
+            loadingIndicator.style.display = show ? 'flex' : 'none';
+        }
+        
+        // --- Core Drawing Functions ---
+        function redrawOnSliderRelease() {
+            requestAnimationFrame(() => {
+                showLoading(true, "レイヤーを更新中...");
+                setTimeout(() => {
+                    // *** MODIFIED: Re-enabled pattern drawing in the main redraw function ***
+                    drawPattern();
+                    drawLineArt();
+                    drawUI();
+                    showLoading(false);
+                }, 10);
+            });
+        }
+        
+        function updateOnSliderInput() {
+             circle.x = parseInt(xSlider.value);
+             circle.y = parseInt(ySlider.value);
+             circle.radius = parseInt(zoomSlider.value);
+             requestAnimationFrame(drawUI);
         }
 
-        // --- Event Listeners ---
-        dropZone.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
-
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, preventDefaults, false);
-        });
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
-        });
-
-        dropZone.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files), false);
-
-        slider1.addEventListener('input', () => {
-            slider1Value.textContent = slider1.value;
-            processImage();
-        });
-        slider2.addEventListener('input', () => {
-            slider2Value.textContent = slider2.value;
-            processImage();
-        });
-
-        saveButton.addEventListener('click', () => {
-            if (canvasOutput.width > 0 && canvasOutput.height > 0) {
-                saveButton.href = canvasOutput.toDataURL('image/png');
-                saveButton.download = 'lineart_image.png';
-            } else {
-                alert('保存する画像がありません。');
-            }
-        });
-
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
+        function drawUI() {
+            uiCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+            uiCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            uiCtx.lineWidth = 3;
+            uiCtx.beginPath();
+            uiCtx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
+            uiCtx.stroke();
         }
 
-        function handleFiles(files) {
-            if (files.length === 0) return;
-            const file = files[0];
-            if (!file.type.startsWith('image/')) {
-                alert('画像ファイルを選択してください。');
-                return;
+        function drawPattern() {
+            patternCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+            patternCtx.save();
+            patternCtx.beginPath();
+            patternCtx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
+            patternCtx.clip();
+            for (let y = 0; y < canvasHeight; y++) {
+                patternCtx.fillStyle = (y % 2 === 0) ? '#FFFFFF' : '#000000';
+                patternCtx.fillRect(0, y, canvasWidth, 1);
             }
+            patternCtx.restore();
+        }
+        
+        function drawLineArt() {
+            if (!originalImageData) return;
+            lineArtCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+            const threshold = parseInt(thresholdSlider.value, 10);
+            const sourceData = originalImageData.data;
+            lineArtCtx.fillStyle = '#7f7f7f';
+            const startX = Math.max(0, Math.floor(circle.x - circle.radius));
+            const endX = Math.min(canvasWidth, Math.ceil(circle.x + circle.radius));
+            const startY = Math.max(0, Math.floor(circle.y - circle.radius));
+            const endY = Math.min(canvasHeight, Math.ceil(circle.y + circle.radius));
+            for (let y = startY; y < endY; y++) {
+                for (let x = startX; x < endX; x++) {
+                    const dx = x - circle.x;
+                    const dy = y - circle.y;
+                    if (dx * dx + dy * dy > circle.radius * circle.radius) continue;
+                    if (x < 1 || x > canvasWidth - 2 || y < 1 || y > canvasHeight - 2) continue;
+                    const getGray = (px, py) => {
+                        const i = (py * canvasWidth + px) * 4;
+                        return (sourceData[i] * 0.299 + sourceData[i + 1] * 0.587 + sourceData[i + 2] * 0.114);
+                    };
+                    const Gx = -getGray(x - 1, y - 1) - 2 * getGray(x - 1, y) - getGray(x - 1, y + 1) +
+                              getGray(x + 1, y - 1) + 2 * getGray(x + 1, y) + getGray(x + 1, y + 1);
+                    const Gy = -getGray(x - 1, y - 1) - 2 * getGray(x, y - 1) - getGray(x + 1, y - 1) +
+                              getGray(x - 1, y + 1) + 2 * getGray(x, y + 1) + getGray(x + 1, y + 1);
+                    const magnitude = Math.sqrt(Gx * Gx + Gy * Gy);
+                    if (magnitude > threshold) {
+                        lineArtCtx.fillRect(x, y, 1, 1);
+                    }
+                }
+            }
+        }
+        
+        // --- Setup and Initialization ---
+        function setupCanvas() {
+            showLoading(true, "画像を4K解像度に変換中...");
+            setTimeout(() => {
+                const ratio = Math.min(MAX_WIDTH / img.width, MAX_HEIGHT / img.height);
+                canvasWidth = Math.round(img.width * ratio);
+                canvasHeight = Math.round(img.height * ratio);
+                canvasContainer.style.aspectRatio = `${canvasWidth} / ${canvasHeight}`;
+                [bgCanvas, patternCanvas, lineArtCanvas, uiCanvas].forEach(canvas => {
+                    canvas.width = canvasWidth;
+                    canvas.height = canvasHeight;
+                });
+                circle.x = canvasWidth / 2;
+                circle.y = canvasHeight / 2;
+                circle.radius = Math.min(canvasWidth, canvasHeight) / 4;
+                
+                // Configure sliders
+                xSlider.min = 0;
+                xSlider.max = canvasWidth;
+                xSlider.value = circle.x;
+                ySlider.min = 0;
+                ySlider.max = canvasHeight;
+                ySlider.value = circle.y;
+                zoomSlider.min = 10;
+                zoomSlider.max = Math.min(canvasWidth, canvasHeight) / 2;
+                zoomSlider.value = circle.radius;
+                
+                bgCtx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+                originalImageData = bgCtx.getImageData(0, 0, canvasWidth, canvasHeight);
+                
+                // Show controls
+                editorArea.style.display = 'block';
+                thresholdControl.classList.remove('hidden');
+                sliderControls.classList.remove('hidden');
+                downloadControl.classList.remove('hidden');
+                
+                redrawOnSliderRelease();
+            }, 50);
+        }
 
+        function handleImageLoad(e) {
+            const file = e.target.files[0];
+            if (!file) return;
             const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    originalImage = img;
-                    editor.classList.remove('hidden');
-                    dropZone.classList.add('hidden');
-                    processImage();
-                };
-                img.src = e.target.result;
+            reader.onload = (event) => {
+                img = new Image();
+                img.onload = setupCanvas;
+                img.onerror = () => { alert("画像の読み込みに失敗しました。"); showLoading(false); };
+                img.src = event.target.result;
             };
             reader.readAsDataURL(file);
         }
-
-        function processImage() {
-            if (!cvReady || !originalImage) return;
-
-            // *** CHANGE: Set canvas resolution to match the original image ***
-            canvasInput.width = originalImage.width;
-            canvasInput.height = originalImage.height;
-            canvasOutput.width = originalImage.width;
-            canvasOutput.height = originalImage.height;
-
-            // Load image to input canvas
-            const ctxInput = canvasInput.getContext('2d');
-            ctxInput.drawImage(originalImage, 0, 0, originalImage.width, originalImage.height);
-
-            // Read image from canvas
-            let src = cv.imread(canvasInput);
-            let gray = new cv.Mat();
-            let edges = new cv.Mat();
-            let transparentBg = new cv.Mat();
-            let colorMat; // Declare here to be accessible in finally block
-
-            try {
-                // Convert to grayscale
-                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-
-                // Canny edge detection
-                const t1 = parseInt(slider1.value, 10);
-                const t2 = parseInt(slider2.value, 10);
-                cv.Canny(gray, edges, t1, t2, 3, false);
-
-                // Create a transparent background image (RGBA)
-                const transparentColor = new cv.Scalar(0, 0, 0, 0);
-                transparentBg = new cv.Mat(src.rows, src.cols, cv.CV_8UC4, transparentColor);
-
-                // Create the line color
-                const lineColor = new cv.Scalar(127, 127, 127, 255);
-
-                // Create a color Mat with the line color
-                colorMat = new cv.Mat(src.rows, src.cols, cv.CV_8UC4, lineColor);
-                
-                // Copy the colored lines onto the transparent background using the edges as a mask
-                colorMat.copyTo(transparentBg, edges);
-                
-                // Display the final image
-                cv.imshow('canvasOutput', transparentBg);
-            } catch (err) {
-                console.error(err);
-                alert("画像処理中にエラーが発生しました。コンソールを確認してください。");
-            } finally {
-                // Clean up memory
-                src.delete();
-                gray.delete();
-                edges.delete();
-                transparentBg.delete();
-                if (colorMat) colorMat.delete();
-            }
+        
+        function handleDownload() {
+            showLoading(true, "最終画像を生成中...");
+            downloadButton.disabled = true;
+            setTimeout(() => {
+                // *** MODIFIED: No longer need to draw the pattern here, as it's already on its canvas ***
+                const finalCanvas = document.createElement('canvas');
+                finalCanvas.width = canvasWidth;
+                finalCanvas.height = canvasHeight;
+                const finalCtx = finalCanvas.getContext('2d');
+                finalCtx.drawImage(bgCanvas, 0, 0);
+                finalCtx.drawImage(patternCanvas, 0, 0);
+                finalCtx.drawImage(lineArtCanvas, 0, 0);
+                const link = document.createElement('a');
+                link.download = 'edited-image.png';
+                link.href = finalCanvas.toDataURL('image/png');
+                link.click();
+                // *** MODIFIED: No longer need to clear the pattern canvas ***
+                showLoading(false);
+                downloadButton.disabled = false;
+            }, 50);
         }
+
+        // --- Attach Event Listeners ---
+        imageLoader.addEventListener('change', handleImageLoad);
+        
+        // Threshold Slider
+        thresholdSlider.addEventListener('input', () => { thresholdValue.textContent = thresholdSlider.value; });
+        thresholdSlider.addEventListener('change', redrawOnSliderRelease); // Also redraws everything on release
+        
+        // Circle Control Sliders
+        [xSlider, ySlider, zoomSlider].forEach(slider => {
+            slider.addEventListener('input', updateOnSliderInput); // Fast preview
+            slider.addEventListener('change', redrawOnSliderRelease); // Heavy processing on release
+        });
+
+        downloadButton.addEventListener('click', handleDownload);
     </script>
 </body>
 </html>
+
