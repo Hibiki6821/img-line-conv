@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web版 画像線画変換ツール</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- OpenCV.js -->
+    <script async src="https://docs.opencv.org/4.9.0/opencv.js" onload="onOpenCvReady();"></script>
+    <style>
+        /* Custom styles */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .drop-zone {
+            border: 2px dashed #cbd5e1;
+            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        }
+        .drop-zone.drag-over {
+            background-color: #e2e8f0;
+            border-color: #4c51bf;
+        }
+        .loader {
+            border-top-color: #4c51bf;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        /* Canvas preview styling */
+        #canvasOutput {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain; /* Maintain aspect ratio */
+        }
+        #output-container {
+             background-image:
+                linear-gradient(45deg, #eee 25%, transparent 25%),
+                linear-gradient(-45deg, #eee 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #eee 75%),
+                linear-gradient(-45deg, transparent 75%, #eee 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl bg-white rounded-xl shadow-lg p-6 md:p-8">
+        <div id="loader" class="text-center">
+            <h1 class="text-2xl font-bold text-gray-700 mb-2">画像線画変換ツール</h1>
+            <div class="flex items-center justify-center space-x-2 text-lg text-indigo-600">
+                <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-6 w-6"></div>
+                <span>OpenCV.jsを読み込み中...</span>
+            </div>
+            <p class="mt-2 text-sm text-gray-500">初回読み込みには少し時間がかかります。</p>
+        </div>
+
+        <div id="main-content" class="hidden">
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-800 text-center mb-6">画像線画変換ツール</h1>
+
+            <!-- Drop Zone -->
+            <div id="drop-zone" class="drop-zone w-full rounded-lg p-8 md:p-12 text-center cursor-pointer mb-6">
+                <p class="text-gray-500">ここに画像ファイルをドラッグ＆ドロップ</p>
+                <p class="text-gray-400 text-sm mt-2">またはクリックしてファイルを選択</p>
+                <input type="file" id="file-input" class="hidden" accept="image/*">
+            </div>
+
+            <!-- Image Preview & Controls -->
+            <div id="editor" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                <!-- Output Canvas -->
+                <div id="output-container" class="w-full bg-white rounded-lg shadow-inner flex items-center justify-center aspect-square overflow-hidden">
+                    <canvas id="canvasOutput"></canvas>
+                </div>
+
+                <!-- Controls -->
+                <div class="bg-gray-50 p-6 rounded-lg">
+                    <h2 class="text-xl font-bold mb-4">設定</h2>
+                    <div class="space-y-6">
+                        <!-- Threshold 1 -->
+                        <div>
+                            <label for="threshold1" class="flex justify-between font-medium text-gray-700">
+                                <span>しきい値 1 (低いほど細かい線)</span>
+                                <span id="threshold1-value" class="text-indigo-600 font-semibold">100</span>
+                            </label>
+                            <input id="threshold1" type="range" min="0" max="500" value="100" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                        <!-- Threshold 2 -->
+                        <div>
+                            <label for="threshold2" class="flex justify-between font-medium text-gray-700">
+                                <span>しきい値 2 (高いほど線を減らす)</span>
+                                <span id="threshold2-value" class="text-indigo-600 font-semibold">200</span>
+                            </label>
+                            <input id="threshold2" type="range" min="0" max="500" value="200" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                    </div>
+                    
+                    <a id="save-button" class="mt-8 block w-full bg-indigo-600 text-white text-center font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 transition duration-300 shadow-md">
+                        画像を保存 (.png)
+                    </a>
+                </div>
+            </div>
+             <!-- Hidden canvas for input image -->
+            <canvas id="canvasInput" class="hidden"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const editor = document.getElementById('editor');
+        const canvasInput = document.getElementById('canvasInput');
+        const canvasOutput = document.getElementById('canvasOutput');
+        const slider1 = document.getElementById('threshold1');
+        const slider2 = document.getElementById('threshold2');
+        const slider1Value = document.getElementById('threshold1-value');
+        const slider2Value = document.getElementById('threshold2-value');
+        const saveButton = document.getElementById('save-button');
+        
+        let originalImage = null;
+        let cvReady = false;
+
+        function onOpenCvReady() {
+            cvReady = true;
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
+            console.log("OpenCV.js is ready.");
+        }
+
+        // --- Event Listeners ---
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
+        });
+
+        dropZone.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files), false);
+
+        slider1.addEventListener('input', () => {
+            slider1Value.textContent = slider1.value;
+            processImage();
+        });
+        slider2.addEventListener('input', () => {
+            slider2Value.textContent = slider2.value;
+            processImage();
+        });
+
+        saveButton.addEventListener('click', () => {
+            if (canvasOutput.width > 0 && canvasOutput.height > 0) {
+                saveButton.href = canvasOutput.toDataURL('image/png');
+                saveButton.download = 'lineart_image.png';
+            } else {
+                alert('保存する画像がありません。');
+            }
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            const file = files[0];
+            if (!file.type.startsWith('image/')) {
+                alert('画像ファイルを選択してください。');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    originalImage = img;
+                    editor.classList.remove('hidden');
+                    dropZone.classList.add('hidden');
+                    processImage();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function processImage() {
+            if (!cvReady || !originalImage) return;
+
+            // *** CHANGE: Set canvas resolution to match the original image ***
+            canvasInput.width = originalImage.width;
+            canvasInput.height = originalImage.height;
+            canvasOutput.width = originalImage.width;
+            canvasOutput.height = originalImage.height;
+
+            // Load image to input canvas
+            const ctxInput = canvasInput.getContext('2d');
+            ctxInput.drawImage(originalImage, 0, 0, originalImage.width, originalImage.height);
+
+            // Read image from canvas
+            let src = cv.imread(canvasInput);
+            let gray = new cv.Mat();
+            let edges = new cv.Mat();
+            let transparentBg = new cv.Mat();
+            let colorMat; // Declare here to be accessible in finally block
+
+            try {
+                // Convert to grayscale
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+
+                // Canny edge detection
+                const t1 = parseInt(slider1.value, 10);
+                const t2 = parseInt(slider2.value, 10);
+                cv.Canny(gray, edges, t1, t2, 3, false);
+
+                // Create a transparent background image (RGBA)
+                const transparentColor = new cv.Scalar(0, 0, 0, 0);
+                transparentBg = new cv.Mat(src.rows, src.cols, cv.CV_8UC4, transparentColor);
+
+                // Create the line color
+                const lineColor = new cv.Scalar(127, 127, 127, 255);
+
+                // Create a color Mat with the line color
+                colorMat = new cv.Mat(src.rows, src.cols, cv.CV_8UC4, lineColor);
+                
+                // Copy the colored lines onto the transparent background using the edges as a mask
+                colorMat.copyTo(transparentBg, edges);
+                
+                // Display the final image
+                cv.imshow('canvasOutput', transparentBg);
+            } catch (err) {
+                console.error(err);
+                alert("画像処理中にエラーが発生しました。コンソールを確認してください。");
+            } finally {
+                // Clean up memory
+                src.delete();
+                gray.delete();
+                edges.delete();
+                transparentBg.delete();
+                if (colorMat) colorMat.delete();
+            }
+        }
+    </script>
+</body>
+</html>
