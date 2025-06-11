@@ -36,6 +36,11 @@
                  align-items: start;
             }
         }
+        /* --- MODIFIED: Explicit Z-indexing for canvases --- */
+        #bgCanvas      { z-index: 10; }
+        #patternCanvas { z-index: 20; }
+        #lineArtCanvas { z-index: 30; }
+        #uiCanvas      { z-index: 40; }
     </style>
 </head>
 <body class="bg-gray-800 text-gray-200">
@@ -43,7 +48,7 @@
     <div class="container mx-auto p-4 md:p-8 max-w-7xl">
         <header class="text-center mb-6">
             <h1 class="text-3xl md:text-4xl font-bold text-white">4K拡大禁止！</h1>
-            <p class="text-gray-400 mt-2">長押し4Kで拡大しちゃダメだよ</p>
+            <p class="text-gray-400 mt-2">強化しました</p>
         </header>
 
         <!-- Controls Section -->
@@ -56,8 +61,9 @@
                         <label for="imageLoader" class="block mb-2 text-sm font-medium text-gray-300">1. 画像を選択</label>
                         <input type="file" id="imageLoader" accept="image/*" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-700 transition-colors cursor-pointer"/>
                     </div>
+                    <!-- --- MODIFIED: Label text changed --- -->
                     <div id="thresholdControl" class="hidden">
-                        <label for="thresholdSlider" class="block mb-2 text-sm font-medium text-gray-300">2. 線画のしきい値: <span id="thresholdValue" class="font-bold text-violet-400">100</span></label>
+                        <label for="thresholdSlider" class="block mb-2 text-sm font-medium text-gray-300">2. 線画の濃さ: <span id="intensityValue" class="font-bold text-violet-400">100</span></label>
                         <input type="range" id="thresholdSlider" min="0" max="255" value="100" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
                     </div>
                 </div>
@@ -114,7 +120,8 @@
         const thresholdControl = document.getElementById('thresholdControl');
         const downloadControl = document.getElementById('downloadControl');
         const thresholdSlider = document.getElementById('thresholdSlider');
-        const thresholdValue = document.getElementById('thresholdValue');
+        // --- MODIFIED: Variable name changed for clarity ---
+        const intensityValue = document.getElementById('intensityValue');
         const downloadButton = document.getElementById('downloadButton');
         const canvasContainer = document.getElementById('canvasContainer');
         const editorArea = document.getElementById('editor-area');
@@ -143,10 +150,6 @@
         let canvasWidth, canvasHeight;
         let circle = { x: 0, y: 0, radius: 150 };
         
-        // --- Constants ---
-        const MAX_WIDTH = 3840;
-        const MAX_HEIGHT = 2160;
-
         // --- Utility Functions ---
         function showLoading(show, text = '処理中...') {
             loadingText.textContent = text;
@@ -158,7 +161,6 @@
             requestAnimationFrame(() => {
                 showLoading(true, "レイヤーを更新中...");
                 setTimeout(() => {
-                    // *** MODIFIED: Re-enabled pattern drawing in the main redraw function ***
                     drawPattern();
                     drawLineArt();
                     drawUI();
@@ -196,32 +198,56 @@
             patternCtx.restore();
         }
         
+        // --- MODIFIED: Rewritten line art generation function ---
         function drawLineArt() {
             if (!originalImageData) return;
             lineArtCtx.clearRect(0, 0, canvasWidth, canvasHeight);
-            const threshold = parseInt(thresholdSlider.value, 10);
+            
+            // Slider now controls intensity. Higher value = darker, more prominent lines.
+            const intensity = parseInt(thresholdSlider.value, 10);
             const sourceData = originalImageData.data;
-            lineArtCtx.fillStyle = '#7f7f7f';
+            
+            // Define the processing area based on the circle's bounding box
             const startX = Math.max(0, Math.floor(circle.x - circle.radius));
             const endX = Math.min(canvasWidth, Math.ceil(circle.x + circle.radius));
             const startY = Math.max(0, Math.floor(circle.y - circle.radius));
             const endY = Math.min(canvasHeight, Math.ceil(circle.y + circle.radius));
+
+            // Iterate over the relevant pixels
             for (let y = startY; y < endY; y++) {
                 for (let x = startX; x < endX; x++) {
                     const dx = x - circle.x;
                     const dy = y - circle.y;
+                    // Skip pixels outside the circle
                     if (dx * dx + dy * dy > circle.radius * circle.radius) continue;
+                    
+                    // Skip pixels at the very edge to avoid reading out of bounds
                     if (x < 1 || x > canvasWidth - 2 || y < 1 || y > canvasHeight - 2) continue;
+
+                    // Helper function to get grayscale value of a pixel
                     const getGray = (px, py) => {
                         const i = (py * canvasWidth + px) * 4;
                         return (sourceData[i] * 0.299 + sourceData[i + 1] * 0.587 + sourceData[i + 2] * 0.114);
                     };
+
+                    // Sobel operator to detect edges
                     const Gx = -getGray(x - 1, y - 1) - 2 * getGray(x - 1, y) - getGray(x - 1, y + 1) +
                               getGray(x + 1, y - 1) + 2 * getGray(x + 1, y) + getGray(x + 1, y + 1);
+
                     const Gy = -getGray(x - 1, y - 1) - 2 * getGray(x, y - 1) - getGray(x + 1, y - 1) +
                               getGray(x - 1, y + 1) + 2 * getGray(x, y + 1) + getGray(x + 1, y + 1);
+
                     const magnitude = Math.sqrt(Gx * Gx + Gy * Gy);
-                    if (magnitude > threshold) {
+
+                    // Calculate alpha based on edge magnitude and slider intensity.
+                    // This makes stronger edges more opaque, and the slider amplifies the effect.
+                    let alpha = (magnitude / 400) * (intensity / 128); // Normalization factors can be tweaked
+                    if (alpha > 1) alpha = 1; // Clamp alpha to a max of 1
+
+                    // Only draw if the pixel is somewhat visible to improve performance
+                    if (alpha > 0.05) {
+                        // Use a constant gray color, but vary the alpha (transparency)
+                        lineArtCtx.fillStyle = `rgba(127, 127, 127, ${alpha})`;
                         lineArtCtx.fillRect(x, y, 1, 1);
                     }
                 }
@@ -230,21 +256,30 @@
         
         // --- Setup and Initialization ---
         function setupCanvas() {
-            showLoading(true, "画像を4K解像度に変換中...");
+            showLoading(true, "画像を準備中...");
             setTimeout(() => {
-                const ratio = Math.min(MAX_WIDTH / img.width, MAX_HEIGHT / img.height);
-                canvasWidth = Math.round(img.width * ratio);
-                canvasHeight = Math.round(img.height * ratio);
+                // Resize image logic: upscale if height is less than 2160px
+                const targetHeight = 2160;
+                if (img.height < targetHeight) {
+                    const aspectRatio = img.width / img.height;
+                    canvasHeight = targetHeight;
+                    canvasWidth = Math.round(canvasHeight * aspectRatio);
+                } else {
+                    canvasWidth = img.width;
+                    canvasHeight = img.height;
+                }
+                
                 canvasContainer.style.aspectRatio = `${canvasWidth} / ${canvasHeight}`;
                 [bgCanvas, patternCanvas, lineArtCanvas, uiCanvas].forEach(canvas => {
                     canvas.width = canvasWidth;
                     canvas.height = canvasHeight;
                 });
+                
                 circle.x = canvasWidth / 2;
                 circle.y = canvasHeight / 2;
                 circle.radius = Math.min(canvasWidth, canvasHeight) / 4;
                 
-                // Configure sliders
+                // Configure sliders based on the final canvas size
                 xSlider.min = 0;
                 xSlider.max = canvasWidth;
                 xSlider.value = circle.x;
@@ -285,19 +320,20 @@
             showLoading(true, "最終画像を生成中...");
             downloadButton.disabled = true;
             setTimeout(() => {
-                // *** MODIFIED: No longer need to draw the pattern here, as it's already on its canvas ***
                 const finalCanvas = document.createElement('canvas');
                 finalCanvas.width = canvasWidth;
                 finalCanvas.height = canvasHeight;
                 const finalCtx = finalCanvas.getContext('2d');
+                
+                // Draw layers in the correct order: background -> pattern -> line art
                 finalCtx.drawImage(bgCanvas, 0, 0);
                 finalCtx.drawImage(patternCanvas, 0, 0);
                 finalCtx.drawImage(lineArtCanvas, 0, 0);
+                
                 const link = document.createElement('a');
                 link.download = 'edited-image.png';
                 link.href = finalCanvas.toDataURL('image/png');
                 link.click();
-                // *** MODIFIED: No longer need to clear the pattern canvas ***
                 showLoading(false);
                 downloadButton.disabled = false;
             }, 50);
@@ -306,14 +342,13 @@
         // --- Attach Event Listeners ---
         imageLoader.addEventListener('change', handleImageLoad);
         
-        // Threshold Slider
-        thresholdSlider.addEventListener('input', () => { thresholdValue.textContent = thresholdSlider.value; });
-        thresholdSlider.addEventListener('change', redrawOnSliderRelease); // Also redraws everything on release
+        // --- MODIFIED: Update label on slider input ---
+        thresholdSlider.addEventListener('input', () => { intensityValue.textContent = thresholdSlider.value; });
+        thresholdSlider.addEventListener('change', redrawOnSliderRelease);
         
-        // Circle Control Sliders
         [xSlider, ySlider, zoomSlider].forEach(slider => {
-            slider.addEventListener('input', updateOnSliderInput); // Fast preview
-            slider.addEventListener('change', redrawOnSliderRelease); // Heavy processing on release
+            slider.addEventListener('input', updateOnSliderInput);
+            slider.addEventListener('change', redrawOnSliderRelease);
         });
 
         downloadButton.addEventListener('click', handleDownload);
