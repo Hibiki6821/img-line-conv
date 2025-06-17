@@ -60,7 +60,7 @@
         <div class="container mx-auto p-4 md:p-8 max-w-7xl">
             <header class="text-center mb-6">
                 <h1 class="text-3xl md:text-4xl font-bold text-white">4K拡大禁止</h1>
-                <p class="text-gray-400 mt-2">4Kで読み込むと線が出てくるアレを作るやつです</p>
+                <p class="text-gray-400 mt-2">4Kで読み込んだら線が出てくるアレです</p>
             </header>
 
             <!-- Controls Section -->
@@ -127,34 +127,64 @@
     </div>
 
     <script>
-        // --- Password Protection Logic ---
+        // --- Password and Cookie Logic ---
         const passwordOverlay = document.getElementById('password-overlay');
         const passwordInput = document.getElementById('passwordInput');
         const passwordSubmit = document.getElementById('passwordSubmit');
         const passwordError = document.getElementById('password-error');
         const mainAppContainer = document.getElementById('main-app');
 
-        function checkPassword() {
-            // The correct password
-            const correctPassword = 'Bulma1234';
+        // Helper function to set a cookie
+        function setCookie(name, value, days) {
+            let expires = "";
+            if (days) {
+                const date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax";
+        }
 
+        // Helper function to get a cookie
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for(let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
+
+        function checkPassword() {
+            const correctPassword = 'Bulma1234';
             if (passwordInput.value === correctPassword) {
-                // If correct, hide overlay and show the app
-                passwordOverlay.style.display = 'none';
-                mainAppContainer.classList.remove('hidden');
-                // Initialize the main application logic
-                initializeApp();
+                // *** MODIFIED: Set a cookie to remember the user for 365 days ***
+                setCookie('isAuthenticated', 'true', 365);
+                showApp();
             } else {
-                // If incorrect, show an error message
                 passwordError.textContent = 'パスワードが正しくありません。';
-                // Shake animation for feedback
                 passwordOverlay.querySelector('div').classList.add('animate-shake');
                 setTimeout(() => {
                     passwordOverlay.querySelector('div').classList.remove('animate-shake');
                 }, 500);
             }
         }
+
+        function showApp() {
+            passwordOverlay.style.display = 'none';
+            mainAppContainer.classList.remove('hidden');
+            initializeApp();
+        }
         
+        // Check for the cookie on page load
+        window.onload = function() {
+            if (getCookie('isAuthenticated') === 'true') {
+                showApp();
+            }
+        };
+
         passwordSubmit.addEventListener('click', checkPassword);
         passwordInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -162,7 +192,7 @@
             }
         });
 
-        // Add a simple shake animation for wrong password
+        // Shake animation for wrong password
         const style = document.createElement('style');
         style.innerHTML = `
             @keyframes shake {
@@ -177,9 +207,8 @@
         document.head.appendChild(style);
 
 
-        // --- Main Application Logic (wrapped in a function) ---
+        // --- Main Application Logic ---
         function initializeApp() {
-            // DOM Elements
             const imageLoader = document.getElementById('imageLoader');
             const thresholdControl = document.getElementById('thresholdControl');
             const downloadControl = document.getElementById('downloadControl');
@@ -194,32 +223,24 @@
             const xSlider = document.getElementById('xSlider');
             const ySlider = document.getElementById('ySlider');
             const zoomSlider = document.getElementById('zoomSlider');
-
-            // Canvases
             const bgCanvas = document.getElementById('bgCanvas');
             const patternCanvas = document.getElementById('patternCanvas');
             const lineArtCanvas = document.getElementById('lineArtCanvas');
             const uiCanvas = document.getElementById('uiCanvas');
-
-            // 2D Contexts
             const bgCtx = bgCanvas.getContext('2d');
             const patternCtx = patternCanvas.getContext('2d');
             const lineArtCtx = lineArtCanvas.getContext('2d');
             const uiCtx = uiCanvas.getContext('2d');
-            
-            // --- Application State ---
             let img = null;
             let originalImageData = null;
             let canvasWidth, canvasHeight;
             let circle = { x: 0, y: 0, radius: 150 };
-            
-            // --- Utility Functions ---
+
             function showLoading(show, text = '処理中...') {
                 loadingText.textContent = text;
                 loadingIndicator.style.display = show ? 'flex' : 'none';
             }
             
-            // --- Core Drawing Functions ---
             function redrawOnSliderRelease() {
                 requestAnimationFrame(() => {
                     showLoading(true, "レイヤーを更新中...");
@@ -293,7 +314,6 @@
                 }
             }
             
-            // --- Setup and Initialization ---
             function setupCanvas() {
                 showLoading(true, "画像を準備中...");
                 setTimeout(() => {
@@ -371,7 +391,6 @@
                 }, 50);
             }
 
-            // --- Attach Event Listeners ---
             imageLoader.addEventListener('change', handleImageLoad);
             thresholdSlider.addEventListener('input', () => { thresholdValue.textContent = thresholdSlider.value; });
             thresholdSlider.addEventListener('change', redrawOnSliderRelease);
