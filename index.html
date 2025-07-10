@@ -59,15 +59,15 @@
     <div id="main-app" class="hidden">
         <div class="container mx-auto p-4 md:p-8 max-w-7xl">
             <header class="text-center mb-6">
-                <h1 class="text-3xl md:text-4xl font-bold text-white">4K拡大禁止</h1>
-                <p class="text-gray-400 mt-2">4Kで読み込んだら線が出てくるアレです</p>
+                <h1 class="text-3xl md:text-4xl font-bold text-white">4k拡大禁止！</h1>
+                <p class="text-gray-400 mt-2">円の他に四角形も追加したよ</p>
             </header>
 
             <!-- Controls Section -->
             <div class="bg-gray-900 p-6 rounded-xl shadow-2xl mb-6">
                 <div class="controls-grid">
                     
-                    <!-- 1. Image Upload -->
+                    <!-- Column 1: Upload & Threshold -->
                     <div class="flex flex-col gap-4">
                         <div>
                             <label for="imageLoader" class="block mb-2 text-sm font-medium text-gray-300">1. 画像を選択</label>
@@ -79,26 +79,58 @@
                         </div>
                     </div>
 
-                    <!-- 2. Slider Controls -->
-                    <div id="sliderControls" class="hidden">
-                        <p class="block mb-2 text-sm font-medium text-gray-300">3. 円をスライダーで操作</p>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div>
-                                <label for="xSlider" class="block text-xs font-medium text-gray-400">X座標</label>
-                                <input type="range" id="xSlider" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
+                    <!-- Column 2: Shape & Sliders -->
+                    <div id="mainControls" class="hidden flex flex-col gap-4">
+                        <div>
+                             <label class="block mb-2 text-sm font-medium text-gray-300">3. 図形を選択</label>
+                             <div class="flex gap-4 p-1 bg-gray-700/50 rounded-lg">
+                                 <button id="shapeCircleBtn" class="w-full py-1.5 text-sm font-medium rounded-md transition-colors bg-violet-600 text-white">円</button>
+                                 <button id="shapeRectBtn" class="w-full py-1.5 text-sm font-medium rounded-md transition-colors text-gray-400 hover:bg-gray-600">四角形</button>
+                             </div>
+                        </div>
+                        <div id="circle-sliders">
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div>
+                                    <label for="xSlider" class="block text-xs font-medium text-gray-400">中心 X座標</label>
+                                    <input type="range" id="xSlider" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
+                                </div>
+                                <div>
+                                    <label for="ySlider" class="block text-xs font-medium text-gray-400">中心 Y座標</label>
+                                    <input type="range" id="ySlider" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
+                                </div>
+                                <div>
+                                    <label for="zoomSlider" class="block text-xs font-medium text-gray-400">半径 (ズーム)</label>
+                                    <input type="range" id="zoomSlider" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
+                                </div>
                             </div>
-                            <div>
-                                <label for="ySlider" class="block text-xs font-medium text-gray-400">Y座標</label>
-                                <input type="range" id="ySlider" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
-                            </div>
-                            <div>
-                                <label for="zoomSlider" class="block text-xs font-medium text-gray-400">ズーム</label>
-                                <input type="range" id="zoomSlider" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
+                        </div>
+                        <div id="rect-sliders" class="hidden">
+                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div>
+                                    <label for="rectXSlider" class="block text-xs font-medium text-gray-400">中心 X座標</label>
+                                    <input type="range" id="rectXSlider" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
+                                </div>
+                                <div>
+                                    <label for="rectYSlider" class="block text-xs font-medium text-gray-400">中心 Y座標</label>
+                                    <input type="range" id="rectYSlider" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
+                                </div>
+                                <div>
+                                    <label for="rectWidthSlider" class="block text-xs font-medium text-gray-400">幅</label>
+                                    <input type="range" id="rectWidthSlider" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
+                                </div>
+                                <div>
+                                    <label for="rectHeightSlider" class="block text-xs font-medium text-gray-400">高さ</label>
+                                    <input type="range" id="rectHeightSlider" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
+                                </div>
+                                <div class="sm:col-span-3">
+                                    <label for="rectAngleSlider" class="block text-xs font-medium text-gray-400">角度: <span id="angleValue">0</span>°</label>
+                                    <input type="range" id="rectAngleSlider" min="0" max="360" value="0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
+                                </div>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- 3. Download Button -->
+                    <!-- Column 3: Download -->
                     <div id="downloadControl" class="hidden self-end">
                         <button id="downloadButton" class="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-md">
                             画像をダウンロード
@@ -134,7 +166,6 @@
         const passwordError = document.getElementById('password-error');
         const mainAppContainer = document.getElementById('main-app');
 
-        // Helper function to set a cookie
         function setCookie(name, value, days) {
             let expires = "";
             if (days) {
@@ -145,7 +176,6 @@
             document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax";
         }
 
-        // Helper function to get a cookie
         function getCookie(name) {
             const nameEQ = name + "=";
             const ca = document.cookie.split(';');
@@ -160,7 +190,6 @@
         function checkPassword() {
             const correctPassword = 'Bulma1234';
             if (passwordInput.value === correctPassword) {
-                // *** MODIFIED: Set a cookie to remember the user for 365 days ***
                 setCookie('isAuthenticated', 'true', 365);
                 showApp();
             } else {
@@ -178,7 +207,6 @@
             initializeApp();
         }
         
-        // Check for the cookie on page load
         window.onload = function() {
             if (getCookie('isAuthenticated') === 'true') {
                 showApp();
@@ -186,29 +214,16 @@
         };
 
         passwordSubmit.addEventListener('click', checkPassword);
-        passwordInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                checkPassword();
-            }
-        });
+        passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') checkPassword(); });
 
-        // Shake animation for wrong password
         const style = document.createElement('style');
-        style.innerHTML = `
-            @keyframes shake {
-                0%, 100% { transform: translateX(0); }
-                10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-                20%, 40%, 60%, 80% { transform: translateX(5px); }
-            }
-            .animate-shake {
-                animation: shake 0.5s ease-in-out;
-            }
-        `;
+        style.innerHTML = ` @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 20%, 40%, 60%, 80% { transform: translateX(5px); } } .animate-shake { animation: shake 0.5s ease-in-out; } `;
         document.head.appendChild(style);
 
 
         // --- Main Application Logic ---
         function initializeApp() {
+            // DOM Elements
             const imageLoader = document.getElementById('imageLoader');
             const thresholdControl = document.getElementById('thresholdControl');
             const downloadControl = document.getElementById('downloadControl');
@@ -219,28 +234,54 @@
             const editorArea = document.getElementById('editor-area');
             const loadingIndicator = document.getElementById('loadingIndicator');
             const loadingText = document.getElementById('loadingText');
-            const sliderControls = document.getElementById('sliderControls');
+            const mainControls = document.getElementById('mainControls');
+            
+            // Shape Selection
+            const shapeCircleBtn = document.getElementById('shapeCircleBtn');
+            const shapeRectBtn = document.getElementById('shapeRectBtn');
+            const circleSlidersEl = document.getElementById('circle-sliders');
+            const rectSlidersEl = document.getElementById('rect-sliders');
+
+            // Circle Sliders
             const xSlider = document.getElementById('xSlider');
             const ySlider = document.getElementById('ySlider');
             const zoomSlider = document.getElementById('zoomSlider');
+
+            // Rectangle Sliders
+            const rectXSlider = document.getElementById('rectXSlider');
+            const rectYSlider = document.getElementById('rectYSlider');
+            const rectWidthSlider = document.getElementById('rectWidthSlider');
+            const rectHeightSlider = document.getElementById('rectHeightSlider');
+            const rectAngleSlider = document.getElementById('rectAngleSlider');
+            const angleValue = document.getElementById('angleValue');
+
+            // Canvases
             const bgCanvas = document.getElementById('bgCanvas');
             const patternCanvas = document.getElementById('patternCanvas');
             const lineArtCanvas = document.getElementById('lineArtCanvas');
             const uiCanvas = document.getElementById('uiCanvas');
+
+            // 2D Contexts
             const bgCtx = bgCanvas.getContext('2d');
             const patternCtx = patternCanvas.getContext('2d');
             const lineArtCtx = lineArtCanvas.getContext('2d');
             const uiCtx = uiCanvas.getContext('2d');
+            
+            // --- Application State ---
             let img = null;
             let originalImageData = null;
             let canvasWidth, canvasHeight;
+            let selectionShape = 'circle';
             let circle = { x: 0, y: 0, radius: 150 };
-
+            let rectangle = { x: 0, y: 0, width: 300, height: 200, angle: 0 };
+            
+            // --- Utility Functions ---
             function showLoading(show, text = '処理中...') {
                 loadingText.textContent = text;
                 loadingIndicator.style.display = show ? 'flex' : 'none';
             }
             
+            // --- Core Drawing Functions ---
             function redrawOnSliderRelease() {
                 requestAnimationFrame(() => {
                     showLoading(true, "レイヤーを更新中...");
@@ -254,9 +295,19 @@
             }
             
             function updateOnSliderInput() {
-                 circle.x = parseInt(xSlider.value);
-                 circle.y = parseInt(ySlider.value);
-                 circle.radius = parseInt(zoomSlider.value);
+                 if (selectionShape === 'circle') {
+                    circle.x = parseInt(xSlider.value);
+                    circle.y = parseInt(ySlider.value);
+                    circle.radius = parseInt(zoomSlider.value);
+                 } else {
+                    rectangle.x = parseInt(rectXSlider.value);
+                    rectangle.y = parseInt(rectYSlider.value);
+                    rectangle.width = parseInt(rectWidthSlider.value);
+                    rectangle.height = parseInt(rectHeightSlider.value);
+                    const angleDeg = parseInt(rectAngleSlider.value);
+                    rectangle.angle = angleDeg * (Math.PI / 180); // Convert to radians
+                    angleValue.textContent = angleDeg;
+                 }
                  requestAnimationFrame(drawUI);
             }
 
@@ -264,21 +315,48 @@
                 uiCtx.clearRect(0, 0, canvasWidth, canvasHeight);
                 uiCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
                 uiCtx.lineWidth = 3;
-                uiCtx.beginPath();
-                uiCtx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
-                uiCtx.stroke();
+                uiCtx.save();
+                if (selectionShape === 'circle') {
+                    uiCtx.beginPath();
+                    uiCtx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
+                    uiCtx.stroke();
+                } else {
+                    uiCtx.translate(rectangle.x, rectangle.y);
+                    uiCtx.rotate(rectangle.angle);
+                    uiCtx.beginPath();
+                    uiCtx.rect(-rectangle.width / 2, -rectangle.height / 2, rectangle.width, rectangle.height);
+                    uiCtx.stroke();
+                }
+                uiCtx.restore();
             }
 
             function drawPattern() {
                 patternCtx.clearRect(0, 0, canvasWidth, canvasHeight);
-                patternCtx.save();
+                patternCtx.save(); // 1. Save the default state
+
+                // 2. Create the clipping path
                 patternCtx.beginPath();
-                patternCtx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
+                if (selectionShape === 'circle') {
+                    patternCtx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
+                } else {
+                    patternCtx.translate(rectangle.x, rectangle.y);
+                    patternCtx.rotate(rectangle.angle);
+                    patternCtx.rect(-rectangle.width / 2, -rectangle.height / 2, rectangle.width, rectangle.height);
+                }
+                
+                // 3. Apply the clip.
                 patternCtx.clip();
+
+                // 4. Reset the transformation matrix to identity
+                patternCtx.setTransform(1, 0, 0, 1, 0, 0);
+
+                // 5. Draw the lines over the entire canvas area.
                 for (let y = 0; y < canvasHeight; y++) {
                     patternCtx.fillStyle = (y % 2 === 0) ? '#FFFFFF' : '#000000';
                     patternCtx.fillRect(0, y, canvasWidth, 1);
                 }
+
+                // 6. Restore the context to its original state
                 patternCtx.restore();
             }
             
@@ -288,16 +366,49 @@
                 const threshold = parseInt(thresholdSlider.value, 10);
                 const sourceData = originalImageData.data;
                 lineArtCtx.fillStyle = '#7f7f7f';
-                const startX = Math.max(0, Math.floor(circle.x - circle.radius));
-                const endX = Math.min(canvasWidth, Math.ceil(circle.x + circle.radius));
-                const startY = Math.max(0, Math.floor(circle.y - circle.radius));
-                const endY = Math.min(canvasHeight, Math.ceil(circle.y + circle.radius));
+
+                let startX, endX, startY, endY;
+                if (selectionShape === 'circle') {
+                    startX = Math.max(0, Math.floor(circle.x - circle.radius));
+                    endX = Math.min(canvasWidth, Math.ceil(circle.x + circle.radius));
+                    startY = Math.max(0, Math.floor(circle.y - circle.radius));
+                    endY = Math.min(canvasHeight, Math.ceil(circle.y + circle.radius));
+                } else {
+                    // Bounding box for rotated rectangle
+                    const diagonal = Math.sqrt(rectangle.width ** 2 + rectangle.height ** 2);
+                    startX = Math.max(0, Math.floor(rectangle.x - diagonal / 2));
+                    endX = Math.min(canvasWidth, Math.ceil(rectangle.x + diagonal / 2));
+                    startY = Math.max(0, Math.floor(rectangle.y - diagonal / 2));
+                    endY = Math.min(canvasHeight, Math.ceil(rectangle.y + diagonal / 2));
+                }
+
                 for (let y = startY; y < endY; y++) {
                     for (let x = startX; x < endX; x++) {
-                        const dx = x - circle.x;
-                        const dy = y - circle.y;
-                        if (dx * dx + dy * dy > circle.radius * circle.radius) continue;
+                        let isInside = false;
+                        if (selectionShape === 'circle') {
+                            const dx = x - circle.x;
+                            const dy = y - circle.y;
+                            if (dx * dx + dy * dy <= circle.radius * circle.radius) {
+                                isInside = true;
+                            }
+                        } else {
+                            // Check if point is inside rotated rectangle
+                            const angle = -rectangle.angle; // un-rotate
+                            const cos = Math.cos(angle);
+                            const sin = Math.sin(angle);
+                            const dx = x - rectangle.x;
+                            const dy = y - rectangle.y;
+                            const unrotatedX = dx * cos - dy * sin;
+                            const unrotatedY = dx * sin + dy * cos;
+                            
+                            if (Math.abs(unrotatedX) < rectangle.width / 2 && Math.abs(unrotatedY) < rectangle.height / 2) {
+                                isInside = true;
+                            }
+                        }
+
+                        if (!isInside) continue;
                         if (x < 1 || x > canvasWidth - 2 || y < 1 || y > canvasHeight - 2) continue;
+                        
                         const getGray = (px, py) => {
                             const i = (py * canvasWidth + px) * 4;
                             return (sourceData[i] * 0.299 + sourceData[i + 1] * 0.587 + sourceData[i + 2] * 0.114);
@@ -314,6 +425,7 @@
                 }
             }
             
+            // --- Setup and Initialization ---
             function setupCanvas() {
                 showLoading(true, "画像を準備中...");
                 setTimeout(() => {
@@ -332,26 +444,26 @@
                         canvas.height = canvasHeight;
                     });
                     
+                    // Set initial values for shapes
                     circle.x = canvasWidth / 2;
                     circle.y = canvasHeight / 2;
                     circle.radius = Math.min(canvasWidth, canvasHeight) / 4;
                     
-                    xSlider.min = 0;
-                    xSlider.max = canvasWidth;
-                    xSlider.value = circle.x;
-                    ySlider.min = 0;
-                    ySlider.max = canvasHeight;
-                    ySlider.value = circle.y;
-                    zoomSlider.min = 10;
-                    zoomSlider.max = Math.min(canvasWidth, canvasHeight) / 2;
-                    zoomSlider.value = circle.radius;
+                    rectangle.x = canvasWidth / 2;
+                    rectangle.y = canvasHeight / 2;
+                    rectangle.width = Math.min(canvasWidth, canvasHeight) / 2;
+                    rectangle.height = Math.min(canvasWidth, canvasHeight) / 3;
+                    rectangle.angle = 0;
+                    
+                    // Configure all sliders
+                    updateAllSliderConfigs();
                     
                     bgCtx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
                     originalImageData = bgCtx.getImageData(0, 0, canvasWidth, canvasHeight);
                     
                     editorArea.style.display = 'block';
                     thresholdControl.classList.remove('hidden');
-                    sliderControls.classList.remove('hidden');
+                    mainControls.classList.remove('hidden');
                     downloadControl.classList.remove('hidden');
                     
                     redrawOnSliderRelease();
@@ -391,13 +503,56 @@
                 }, 50);
             }
 
+            function updateAllSliderConfigs() {
+                // Circle sliders
+                xSlider.min = 0; xSlider.max = canvasWidth; xSlider.value = circle.x;
+                ySlider.min = 0; ySlider.max = canvasHeight; ySlider.value = circle.y;
+                zoomSlider.min = 10; zoomSlider.max = Math.min(canvasWidth, canvasHeight) / 2; zoomSlider.value = circle.radius;
+                // Rectangle sliders
+                rectXSlider.min = 0; rectXSlider.max = canvasWidth; rectXSlider.value = rectangle.x;
+                rectYSlider.min = 0; rectYSlider.max = canvasHeight; rectYSlider.value = rectangle.y;
+                rectWidthSlider.min = 10; rectWidthSlider.max = canvasWidth; rectWidthSlider.value = rectangle.width;
+                rectHeightSlider.min = 10; rectHeightSlider.max = canvasHeight; rectHeightSlider.value = rectangle.height;
+                rectAngleSlider.value = 0; angleValue.textContent = '0';
+            }
+
+            function switchShape(toShape) {
+                selectionShape = toShape;
+                if (toShape === 'circle') {
+                    // Show circle UI
+                    circleSlidersEl.classList.remove('hidden');
+                    rectSlidersEl.classList.add('hidden');
+                    shapeCircleBtn.classList.add('bg-violet-600', 'text-white');
+                    shapeCircleBtn.classList.remove('text-gray-400', 'hover:bg-gray-600');
+                    shapeRectBtn.classList.remove('bg-violet-600', 'text-white');
+                    shapeRectBtn.classList.add('text-gray-400', 'hover:bg-gray-600');
+                } else { // 'rectangle'
+                    // Show rectangle UI
+                    circleSlidersEl.classList.add('hidden');
+                    rectSlidersEl.classList.remove('hidden');
+                    shapeRectBtn.classList.add('bg-violet-600', 'text-white');
+                    shapeRectBtn.classList.remove('text-gray-400', 'hover:bg-gray-600');
+                    shapeCircleBtn.classList.remove('bg-violet-600', 'text-white');
+                    shapeCircleBtn.classList.add('text-gray-400', 'hover:bg-gray-600');
+                }
+                redrawOnSliderRelease();
+            }
+
+            // --- Attach Event Listeners ---
             imageLoader.addEventListener('change', handleImageLoad);
             thresholdSlider.addEventListener('input', () => { thresholdValue.textContent = thresholdSlider.value; });
             thresholdSlider.addEventListener('change', redrawOnSliderRelease);
-            [xSlider, ySlider, zoomSlider].forEach(slider => {
+            
+            // All Sliders
+            [xSlider, ySlider, zoomSlider, rectXSlider, rectYSlider, rectWidthSlider, rectHeightSlider, rectAngleSlider].forEach(slider => {
                 slider.addEventListener('input', updateOnSliderInput);
                 slider.addEventListener('change', redrawOnSliderRelease);
             });
+
+            // Shape Switcher
+            shapeCircleBtn.addEventListener('click', () => switchShape('circle'));
+            shapeRectBtn.addEventListener('click', () => switchShape('rectangle'));
+
             downloadButton.addEventListener('click', handleDownload);
         }
     </script>
