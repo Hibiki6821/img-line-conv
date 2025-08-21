@@ -59,8 +59,8 @@
     <div id="main-app" class="hidden">
         <div class="container mx-auto p-4 md:p-8 max-w-7xl">
             <header class="text-center mb-6">
-                <h1 class="text-3xl md:text-4xl font-bold text-white">4k拡大禁止！</h1>
-                <p class="text-gray-400 mt-2">ペンで選択範囲描けるようにしました</p>
+                <h1 class="text-3xl md:text-4xl font-bold text-white">4K拡大禁止</h1>
+                <p class="text-gray-400 mt-2">ペンで範囲描画できるようにしました</p>
             </header>
 
             <!-- Controls Section -->
@@ -98,6 +98,11 @@
                                 <label for="brushSizeSlider" class="block mb-2 text-sm font-medium text-gray-300">ブラシサイズ: <span id="brushSizeValue">50</span></label>
                                 <input type="range" id="brushSizeSlider" min="1" max="300" value="50" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
                             </div>
+                             <div class="mt-4">
+                                <button id="applyDrawBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                    範囲を確定
+                                </button>
+                            </div>
                         </div>
                         <!-- Shape Tools -->
                         <div id="shape-tools" class="hidden">
@@ -120,6 +125,11 @@
                                     <div><label for="rectHeightSlider" class="block text-xs font-medium text-gray-400">高さ</label><input type="range" id="rectHeightSlider" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500"></div>
                                     <div class="sm:col-span-2"><label for="rectAngleSlider" class="block text-xs font-medium text-gray-400">角度: <span id="angleValue">0</span>°</label><input type="range" id="rectAngleSlider" min="0" max="360" value="0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500"></div>
                                 </div>
+                            </div>
+                            <div class="mt-4">
+                                <button id="applyShapeBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                    範囲を確定
+                                </button>
                             </div>
                         </div>
                          <div class="mt-4">
@@ -245,6 +255,8 @@
             const brushSizeSlider = document.getElementById('brushSizeSlider');
             const brushSizeValue = document.getElementById('brushSizeValue');
             const clearBtn = document.getElementById('clearBtn');
+            const applyDrawBtn = document.getElementById('applyDrawBtn');
+            const applyShapeBtn = document.getElementById('applyShapeBtn');
             const shapeCircleBtn = document.getElementById('shapeCircleBtn');
             const shapeRectBtn = document.getElementById('shapeRectBtn');
             const circleSlidersEl = document.getElementById('circle-sliders');
@@ -355,8 +367,7 @@
                 previewCtx.restore();
             }
 
-            function generateFinalLayers() {
-                // Generate Pattern
+            function generatePattern() {
                 patternCtx.clearRect(0, 0, canvasWidth, canvasHeight);
                 patternCtx.save();
                 for (let y = 0; y < canvasHeight; y++) {
@@ -366,9 +377,11 @@
                 patternCtx.globalCompositeOperation = 'destination-in';
                 patternCtx.drawImage(maskCanvas, 0, 0);
                 patternCtx.restore();
+            }
 
-                // Generate Line Art
+            function generateLineArt() {
                 lineArtCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+                if (!originalImageData) return;
                 const maskData = maskCtx.getImageData(0, 0, canvasWidth, canvasHeight).data;
                 const threshold = parseInt(thresholdSlider.value, 10);
                 const sourceData = originalImageData.data;
@@ -446,11 +459,9 @@
             }
             
             function handleDownload() {
-                showLoading(true, "加工処理を適用中...");
+                showLoading(true, "最終画像を生成中...");
                 downloadButton.disabled = true;
                 setTimeout(() => {
-                    generateFinalLayers();
-                    
                     const finalCanvas = document.createElement('canvas');
                     finalCanvas.width = canvasWidth;
                     finalCanvas.height = canvasHeight;
@@ -523,6 +534,26 @@
                 [maskCtx, previewCtx, patternCtx, lineArtCtx].forEach(ctx => ctx.clearRect(0,0,canvasWidth, canvasHeight));
             });
 
+            applyDrawBtn.addEventListener('click', () => {
+                showLoading(true, "加工処理を適用中...");
+                setTimeout(() => {
+                    previewCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+                    generatePattern();
+                    generateLineArt();
+                    showLoading(false);
+                }, 10);
+            });
+            
+            applyShapeBtn.addEventListener('click', () => {
+                 showLoading(true, "加工処理を適用中...");
+                setTimeout(() => {
+                    previewCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+                    generatePattern();
+                    generateLineArt();
+                    showLoading(false);
+                }, 10);
+            });
+
             shapeCircleBtn.addEventListener('click', () => {
                 currentShape = 'circle';
                 circleSlidersEl.classList.remove('hidden');
@@ -542,25 +573,32 @@
                 updatePreviewFromMask();
             });
 
-            const allSliders = [xSlider, ySlider, zoomSlider, rectXSlider, rectYSlider, rectWidthSlider, rectHeightSlider, rectAngleSlider, thresholdSlider];
+            const allSliders = [xSlider, ySlider, zoomSlider, rectXSlider, rectYSlider, rectWidthSlider, rectHeightSlider, rectAngleSlider];
             allSliders.forEach(slider => {
                 slider.addEventListener('input', () => {
-                    if (currentMode === 'shape') {
-                        if (currentShape === 'circle') {
-                            circle.x = parseInt(xSlider.value); circle.y = parseInt(ySlider.value); circle.radius = parseInt(zoomSlider.value);
-                        } else {
-                            rectangle.x = parseInt(rectXSlider.value); rectangle.y = parseInt(rectYSlider.value); rectangle.width = parseInt(rectWidthSlider.value); rectangle.height = parseInt(rectHeightSlider.value);
-                            const angleDeg = parseInt(rectAngleSlider.value);
-                            rectangle.angle = angleDeg * (Math.PI / 180);
-                            angleValue.textContent = angleDeg;
-                        }
-                        updateMaskWithShape();
-                        updatePreviewFromMask();
+                    if (currentMode !== 'shape') return;
+                    if (currentShape === 'circle') {
+                        circle.x = parseInt(xSlider.value); circle.y = parseInt(ySlider.value); circle.radius = parseInt(zoomSlider.value);
+                    } else {
+                        rectangle.x = parseInt(rectXSlider.value); rectangle.y = parseInt(rectYSlider.value); rectangle.width = parseInt(rectWidthSlider.value); rectangle.height = parseInt(rectHeightSlider.value);
+                        const angleDeg = parseInt(rectAngleSlider.value);
+                        rectangle.angle = angleDeg * (Math.PI / 180);
+                        angleValue.textContent = angleDeg;
                     }
-                     if (slider === thresholdSlider) {
-                        thresholdValue.textContent = thresholdSlider.value;
-                    }
+                    updateMaskWithShape();
+                    updatePreviewFromMask();
                 });
+            });
+            
+            thresholdSlider.addEventListener('input', () => {
+                thresholdValue.textContent = thresholdSlider.value;
+            });
+            thresholdSlider.addEventListener('change', () => {
+                showLoading(true, "線画を更新中...");
+                setTimeout(() => {
+                    generateLineArt();
+                    showLoading(false);
+                }, 10);
             });
 
             function startDraw(e) {
@@ -576,7 +614,6 @@
                 e.preventDefault();
                 drawOnMask(pos);
                 updatePreviewFromMask();
-                lastPos = pos;
             }
             function stopDraw() {
                 isDrawing = false;
