@@ -59,7 +59,7 @@
     <div id="main-app" class="hidden">
         <div class="container mx-auto p-4 md:p-8 max-w-7xl">
             <header class="text-center mb-6">
-                <h1 class="text-3xl md:text-4xl font-bold text-white">4k拡大禁止</h1>
+                <h1 class="text-3xl md:text-4xl font-bold text-white">4k読み込み禁止</h1>
                 <p class="text-gray-400 mt-2">打倒アダアフィ</p>
             </header>
 
@@ -74,8 +74,8 @@
                             <input type="file" id="imageLoader" accept="image/*" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-700 transition-colors cursor-pointer"/>
                         </div>
                         <div id="thresholdControl" class="hidden">
-                            <label for="thresholdSlider" class="block mb-2 text-sm font-medium text-gray-300">2. 線画のしきい値: <span id="thresholdValue" class="font-bold text-violet-400">100</span></label>
-                            <input type="range" id="thresholdSlider" min="0" max="255" value="100" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
+                            <label for="thresholdSlider" class="block mb-2 text-sm font-medium text-gray-300">2. 濃淡のコントラスト: <span id="thresholdValue" class="font-bold text-violet-400">100</span></label>
+                            <input type="range" id="thresholdSlider" min="0" max="255" value="128" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500">
                         </div>
                     </div>
 
@@ -154,7 +154,7 @@
                  <div id="canvasContainer" class="relative w-full mx-auto" style="aspect-ratio: 16/9;">
                     <canvas id="bgCanvas" class="absolute top-0 left-0 w-full h-full rounded-lg bg-black/20"></canvas>
                     <canvas id="patternCanvas" class="absolute top-0 left-0 w-full h-full rounded-lg pointer-events-none"></canvas>
-                    <canvas id="lineArtCanvas" class="absolute top-0 left-0 w-full h-full rounded-lg pointer-events-none"></canvas>
+                    <canvas id="processedImageCanvas" class="absolute top-0 left-0 w-full h-full rounded-lg pointer-events-none"></canvas>
                     <canvas id="maskCanvas" class="hidden"></canvas>
                     <canvas id="previewCanvas" class="absolute top-0 left-0 w-full h-full rounded-lg pointer-events-none"></canvas>
                     <canvas id="interactionCanvas" class="absolute top-0 left-0 w-full h-full rounded-lg cursor-crosshair"></canvas>
@@ -274,7 +274,7 @@
             // Canvases
             const bgCanvas = document.getElementById('bgCanvas');
             const patternCanvas = document.getElementById('patternCanvas');
-            const lineArtCanvas = document.getElementById('lineArtCanvas');
+            const processedImageCanvas = document.getElementById('processedImageCanvas');
             const maskCanvas = document.getElementById('maskCanvas');
             const previewCanvas = document.getElementById('previewCanvas');
             const interactionCanvas = document.getElementById('interactionCanvas');
@@ -282,7 +282,7 @@
             // Contexts
             const bgCtx = bgCanvas.getContext('2d');
             const patternCtx = patternCanvas.getContext('2d');
-            const lineArtCtx = lineArtCanvas.getContext('2d');
+            const processedImageCtx = processedImageCanvas.getContext('2d');
             const maskCtx = maskCanvas.getContext('2d');
             const previewCtx = previewCanvas.getContext('2d');
             const interactionCtx = interactionCanvas.getContext('2d');
@@ -370,57 +370,71 @@
             function generatePattern() {
                 patternCtx.clearRect(0, 0, canvasWidth, canvasHeight);
                 patternCtx.save();
-                for (let y = 0; y < canvasHeight; y++) {
-                    patternCtx.fillStyle = (y % 2 === 0) ? '#FFFFFF' : '#000000';
-                    patternCtx.fillRect(0, y, canvasWidth, 1);
+                for (let x = 0; x < canvasWidth; x++) {
+                    patternCtx.fillStyle = (x % 2 !== 0) ? 'black' : 'white'; // 奇数列を黒
+                    patternCtx.fillRect(x, 0, 1, canvasHeight);
                 }
                 patternCtx.globalCompositeOperation = 'destination-in';
                 patternCtx.drawImage(maskCanvas, 0, 0);
                 patternCtx.restore();
             }
 
-            function generateLineArt() {
-                lineArtCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+            function generateProcessedImage() {
+                processedImageCtx.clearRect(0, 0, canvasWidth, canvasHeight);
                 if (!originalImageData) return;
-                const maskData = maskCtx.getImageData(0, 0, canvasWidth, canvasHeight).data;
-                const threshold = parseInt(thresholdSlider.value, 10);
-                const sourceData = originalImageData.data;
-                lineArtCtx.fillStyle = '#7f7f7f';
 
-                for (let y = 1; y < canvasHeight - 1; y++) {
-                    for (let x = 1; x < canvasWidth - 1; x++) {
-                        const i = (y * canvasWidth + x) * 4;
-                        if (maskData[i + 3] === 0) continue;
-                        
-                        const getGray = (px, py) => {
-                            const idx = (py * canvasWidth + px) * 4;
-                            return (sourceData[idx] * 0.299 + sourceData[idx + 1] * 0.587 + sourceData[idx + 2] * 0.114);
-                        };
-                        const Gx = -getGray(x - 1, y - 1) - 2 * getGray(x - 1, y) - getGray(x - 1, y + 1) + getGray(x + 1, y - 1) + 2 * getGray(x + 1, y) + getGray(x + 1, y + 1);
-                        const Gy = -getGray(x - 1, y - 1) - 2 * getGray(x, y - 1) - getGray(x + 1, y - 1) + getGray(x - 1, y + 1) + 2 * getGray(x, y + 1) + getGray(x + 1, y + 1);
-                        const magnitude = Math.sqrt(Gx * Gx + Gy * Gy);
-                        if (magnitude > threshold) {
-                            lineArtCtx.fillRect(x, y, 1, 1);
-                        }
-                    }
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = canvasWidth;
+                tempCanvas.height = canvasHeight;
+                
+                const newImageData = tempCtx.createImageData(canvasWidth, canvasHeight);
+                const sourceData = originalImageData.data;
+                const contrastFactor = Math.pow((parseInt(thresholdSlider.value, 10) + 1) / 128, 2);
+
+                for (let i = 0; i < sourceData.length; i += 4) {
+                    const r = sourceData[i];
+                    const g = sourceData[i + 1];
+                    const b = sourceData[i + 2];
+                    
+                    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                    
+                    let contrastedGray = 128 + (gray - 128) * contrastFactor;
+                    contrastedGray = Math.max(0, Math.min(255, contrastedGray));
+                    
+                    const alpha = 255 - contrastedGray;
+
+                    newImageData.data[i] = 127;
+                    newImageData.data[i + 1] = 127;
+                    newImageData.data[i + 2] = 127;
+                    newImageData.data[i + 3] = alpha;
                 }
+
+                tempCtx.putImageData(newImageData, 0, 0);
+                
+                processedImageCtx.save();
+                processedImageCtx.drawImage(tempCanvas, 0, 0);
+                processedImageCtx.globalCompositeOperation = 'destination-in';
+                processedImageCtx.drawImage(maskCanvas, 0, 0);
+                processedImageCtx.restore();
             }
             
             // --- Setup ---
             function setupCanvas() {
                 showLoading(true, "画像を準備中...");
                 setTimeout(() => {
-                    if (img.height < 2160) {
-                        const aspectRatio = img.width / img.height;
-                        canvasHeight = 2160;
-                        canvasWidth = Math.round(canvasHeight * aspectRatio);
+                    const shorterSide = Math.min(img.width, img.height);
+                    if (shorterSide < 2160) {
+                        const ratio = 2160 / shorterSide;
+                        canvasWidth = Math.round(img.width * ratio);
+                        canvasHeight = Math.round(img.height * ratio);
                     } else {
                         canvasWidth = img.width;
                         canvasHeight = img.height;
                     }
                     
                     canvasContainer.style.aspectRatio = `${canvasWidth} / ${canvasHeight}`;
-                    [bgCanvas, patternCanvas, lineArtCanvas, maskCanvas, previewCanvas, interactionCanvas].forEach(canvas => {
+                    [bgCanvas, patternCanvas, processedImageCanvas, maskCanvas, previewCanvas, interactionCanvas].forEach(canvas => {
                         canvas.width = canvasWidth;
                         canvas.height = canvasHeight;
                     });
@@ -433,10 +447,7 @@
                     updateAllSliderConfigs();
                     
                     editorArea.style.display = 'block';
-                    
-                    // Recalculate scale factor AFTER canvas is visible
                     displayToCanvasScale = canvasWidth / interactionCanvas.getBoundingClientRect().width;
-
                     thresholdControl.classList.remove('hidden');
                     mainControls.classList.remove('hidden');
                     downloadControl.classList.remove('hidden');
@@ -468,7 +479,7 @@
                     const finalCtx = finalCanvas.getContext('2d');
                     finalCtx.drawImage(bgCanvas, 0, 0);
                     finalCtx.drawImage(patternCanvas, 0, 0);
-                    finalCtx.drawImage(lineArtCanvas, 0, 0);
+                    finalCtx.drawImage(processedImageCanvas, 0, 0);
                     const link = document.createElement('a');
                     link.download = 'edited-image.png';
                     link.href = finalCanvas.toDataURL('image/png');
@@ -491,7 +502,7 @@
 
             function switchMode(toMode) {
                 currentMode = toMode;
-                [maskCtx, previewCtx, patternCtx, lineArtCtx, interactionCtx].forEach(ctx => ctx.clearRect(0,0,canvasWidth, canvasHeight));
+                [maskCtx, previewCtx, patternCtx, processedImageCtx, interactionCtx].forEach(ctx => ctx.clearRect(0,0,canvasWidth, canvasHeight));
                 
                 if (toMode === 'draw') {
                     drawToolsEl.classList.remove('hidden');
@@ -531,28 +542,20 @@
                 brushSizeValue.textContent = brushSize;
             });
             clearBtn.addEventListener('click', () => {
-                [maskCtx, previewCtx, patternCtx, lineArtCtx].forEach(ctx => ctx.clearRect(0,0,canvasWidth, canvasHeight));
+                [maskCtx, previewCtx, patternCtx, processedImageCtx].forEach(ctx => ctx.clearRect(0,0,canvasWidth, canvasHeight));
             });
 
-            applyDrawBtn.addEventListener('click', () => {
+            function applyProcessing() {
                 showLoading(true, "加工処理を適用中...");
                 setTimeout(() => {
                     previewCtx.clearRect(0, 0, canvasWidth, canvasHeight);
                     generatePattern();
-                    generateLineArt();
+                    generateProcessedImage();
                     showLoading(false);
                 }, 10);
-            });
-            
-            applyShapeBtn.addEventListener('click', () => {
-                 showLoading(true, "加工処理を適用中...");
-                setTimeout(() => {
-                    previewCtx.clearRect(0, 0, canvasWidth, canvasHeight);
-                    generatePattern();
-                    generateLineArt();
-                    showLoading(false);
-                }, 10);
-            });
+            }
+            applyDrawBtn.addEventListener('click', applyProcessing);
+            applyShapeBtn.addEventListener('click', applyProcessing);
 
             shapeCircleBtn.addEventListener('click', () => {
                 currentShape = 'circle';
@@ -594,9 +597,9 @@
                 thresholdValue.textContent = thresholdSlider.value;
             });
             thresholdSlider.addEventListener('change', () => {
-                showLoading(true, "線画を更新中...");
+                showLoading(true, "コントラストを更新中...");
                 setTimeout(() => {
-                    generateLineArt();
+                    generateProcessedImage();
                     showLoading(false);
                 }, 10);
             });
